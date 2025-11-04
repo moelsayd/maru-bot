@@ -25,7 +25,7 @@ const botConfig = {
 // ---------- ENCRYPTION SETUP ----------
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex');
 const ALGORITHM = 'aes-256-gcm';
-function encrypt(text) {
+function encryptData(text) {
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipher(ALGORITHM, ENCRYPTION_KEY);
     let encrypted = cipher.update(text, 'utf8', 'hex');
@@ -37,7 +37,7 @@ function encrypt(text) {
         tag: authTag.toString('hex')
     };
 }
-function decrypt(encryptedData) {
+function decryptData(encryptedData) {
     const decipher = crypto.createDecipher(ALGORITHM, ENCRYPTION_KEY);
     decipher.setAuthTag(Buffer.from(encryptedData.tag, 'hex'));
     let decrypted = decipher.update(encryptedData.data, 'hex', 'utf8');
@@ -112,7 +112,7 @@ function saveState() {
         state.rateLimits = rateLimits;
         state.stats.lastSave = new Date().toISOString();
         // Encrypt and save
-        const encryptedData = encrypt(JSON.stringify(state));
+        const encryptedData = encryptData(JSON.stringify(state));
         const tmpFile = STATE_FILE + '.tmp';
         fs.writeFileSync(tmpFile, JSON.stringify(encryptedData, null, 2));
         fs.renameSync(tmpFile, STATE_FILE);
@@ -126,7 +126,7 @@ function loadState() {
     try {
         const fileData = fs.readFileSync(STATE_FILE, 'utf8');
         const encryptedData = JSON.parse(fileData);
-        const decryptedData = decrypt(encryptedData);
+        const decryptedData = decryptData(encryptedData);
         state = JSON.parse(decryptedData);
         users = state.users = state.users || {};
         eliteUsers.clear();
@@ -619,3 +619,41 @@ async function startMaruBot() {
 startMaruBot().catch(console.error);
 // Export for testing
 export { botConfig, commands, RateLimiter };
+
+/* --- modern AES-GCM encrypt/decrypt - added to replace deprecated createCipher --- */
+import { randomBytes } from 'crypto';
+
+function _getKeyFromEnv() {
+  // ENCRYPTION_KEY يجب أن يكون hex بطول 64 (32 bytes) — إذا لم يكن موجودًا سنستخدم مفتاحًا افتراضياً (غير مستحسن للبيئة الحقيقية)
+  try {
+    return Buffer.from(ENCRYPTION_KEY, 'hex');
+  } catch (e) {
+    // fallback (only if ENCRYPTION_KEY not hex) - NOT RECOMMENDED FOR PROD
+    return Buffer.from(ENCRYPTION_KEY || crypto.randomBytes(32).toString('hex'), 'hex');
+  }
+}
+
+function encryptData(text) {
+  const key = _getKeyFromEnv();
+  const iv = crypto.randomBytes(12); // 96-bit nonce recommended for GCM
+  const cipher = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const encrypted = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return {
+    iv: iv.toString('hex'),
+    data: encrypted.toString('hex'),
+    tag: tag.toString('hex')
+  };
+}
+
+function decryptData(encryptedData) {
+  const key = _getKeyFromEnv();
+  const iv = Buffer.from(encryptedData.iv, 'hex');
+  const tag = Buffer.from(encryptedData.tag, 'hex');
+  const decipher = crypto.createDecipheriv('aes-256-gcm', key, iv);
+  decipher.setAuthTag(tag);
+  const decrypted = Buffer.concat([decipher.update(Buffer.from(encryptedData.data, 'hex')), decipher.final()]);
+  return decrypted.toString('utf8');
+}
+/* --- end AES-GCM helpers --- */
+
