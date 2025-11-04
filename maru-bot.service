@@ -1,0 +1,16 @@
+[Unit]
+Description=Maru Bot
+After=network.target
+
+[Service]
+Type=simple
+User=youruser
+WorkingDirectory=/home/youruser/maru-bot
+EnvironmentFile=/home/youruser/maru-bot/.env
+ExecStart=/usr/bin/node /home/youruser/maru-bot/maru-bot-merged.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+
