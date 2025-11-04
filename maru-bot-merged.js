@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 // maru-bot-pro.js
+=======
+ // maru-bot-pro.js
+>>>>>>> bd8454c (Initial commit - Maru Bot)
 import makeWASocket, { useMultiFileAuthState, fetchLatestBaileysVersion } from '@whiskeysockets/baileys';
 import fs from 'fs';
 import path from 'path';

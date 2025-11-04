@@ -1,0 +1,7 @@
+node_modules/
+auth_maru/
+auth_maru_pro/
+.env
+maru_state.json
+maru_secure_state.json
+*.log
